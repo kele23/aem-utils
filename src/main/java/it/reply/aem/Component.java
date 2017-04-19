@@ -16,19 +16,37 @@ import java.util.regex.Pattern;
 class Component {
 
     private static final String CONTENT_XML = ".content.xml";
-    private static final String DIALOG_XML = "dialog.xml";
+    private static final String CQ_DIALOG_XML = "_cq_dialog/.content.xml";
 
     private static final String SLY_CQ_COMPONENT_EXPRESSION = "jcr:primaryType=([\"'])cq:Component\\1";
     private static final String SLY_I18N_EXPRESSION = "\\$\\{[^\"'\\}]*([\"'])(.+)\\1[^\\}]*@[^\\}]*i18n[^\\}]*\\}"; // ${"text" @ i18n} (2:text)
     private static final String SLY_INCLUDE_EXPRESSION = "data-sly-include=([\"'])(.+)\\1"; //data-sly-include="test" => (2:test)
-    private static final String SLY_DIALOG_LABEL_EXPRESSION = "fieldLabel=([\"'])([^\"']+)\\1"; //fieldLabel="ciao" => (2:ciao)
-    private static final String SLY_DIALOG_DESCRIPTION_EXPRESSION = "fieldDescription=([\"'])([^\"']+)\\1"; //fieldDescription="ciao" => (2:ciao)
+    private static final String DIALOG_LABEL_EXPRESSION = "fieldLabel=([\"'])(.+)\\1"; //fieldLabel="ciao" => (2:ciao)
+    private static final String DIALOG_DESCRIPTION_EXPRESSION = "fieldDescription=([\"'])(.+)\\1"; //fieldDescription="ciao" => (2:ciao)
+    private static final String DIALOG_JCR_TITLE_EXPRESSION = "jcr:title=([\"'])(.+)\\1"; //jcr:title="titolo" => (2:titolo)
+    private static final String DIALOG_INCLUDE_EXPRESSION = "sling:resourceType=([\"'])granite\\/ui\\/components\\/foundation\\/include\\1\\s*path=([\"'])(.+)\\2"; // => (3:test)
 
     private static final Pattern SLY_I18N_PATTERN = Pattern.compile(SLY_I18N_EXPRESSION);
     private static final Pattern SLY_INCLUDE_PATTERN = Pattern.compile(SLY_INCLUDE_EXPRESSION);
     private static final Pattern SLY_CQ_COMPONENT_PATTERN = Pattern.compile(SLY_CQ_COMPONENT_EXPRESSION);
-    private static final Pattern SLY_DIALOG_LABEL_PATTERN = Pattern.compile(SLY_DIALOG_LABEL_EXPRESSION);
-    private static final Pattern SLY_DIALOG_DESCRIPTION_PATTERN = Pattern.compile(SLY_DIALOG_DESCRIPTION_EXPRESSION);
+    private static final Pattern DIALOG_LABEL_PATTERN = Pattern.compile(DIALOG_LABEL_EXPRESSION);
+    private static final Pattern DIALOG_DESCRIPTION_PATTERN = Pattern.compile(DIALOG_DESCRIPTION_EXPRESSION);
+    private static final Pattern DIALOG_JCR_TITLE_PATTERN = Pattern.compile(DIALOG_JCR_TITLE_EXPRESSION);
+    private static final Pattern DIALOG_INCLUDE_PATTERN = Pattern.compile(DIALOG_INCLUDE_EXPRESSION);
+
+    /******** CLASSIC DIALOG INCLUDE ******* FIXME
+     * <marginConfiguration
+     *      jcr:primaryType="cq:Widget"
+     *      path="/apps/reoco/components/structure/page/fragments-dlg/tab_panel-margin.infinity.json"
+     *      xtype="cqinclude"/>
+     ********************************/
+
+    /******** TOUCH UI DIALOG INCLUDE ******* OK!!!
+     * <advanced
+     *      jcr:primaryType="nt:unstructured"
+     *      sling:resourceType="granite/ui/components/foundation/include"
+     *      path="/apps/credem/components/structure/pages/page/tabs/tab_advanced"/>
+     ********************************/
 
     private File directory;
     private String componentName;
@@ -41,7 +59,6 @@ class Component {
     private Component(File directory){
         this.directory = directory;
         componentName = directory.getName();
-        this.i18nKeys = makeI18nKeys();
     }
 
     /**
@@ -56,63 +73,20 @@ class Component {
      * Return the i18nKeys founded in the component
      * @return i18keys
      */
-    List<String> getI18nKeys(){
-        return i18nKeys;
-    }
-
-    /**
-     * Get All i18n keys from the component
-     * @return A list of i18n keys
-     */
-    @Nullable
-    private List<String> makeI18nKeys() {
+    List<String> getI18nKeys(boolean withDialog){
+        List<String> i18nKeys = new ArrayList<>();
 
         List<File> htmlFiles = getCompFiles();
-        if(htmlFiles == null)
-            return null;
-
-        //Component i18n
-        List<String> i18nKeys = new ArrayList<>();
-        for(File f : htmlFiles) {
-            List<String> keys = getFileI18nKeys(f);
-            if(keys != null){
-                i18nKeys.addAll(keys);
+        if(htmlFiles != null) {
+            for (File f : htmlFiles) {
+                List<String> keys = getFileI18nKeys(f,withDialog);
+                if (keys != null) {
+                    i18nKeys.addAll(keys);
+                }
             }
-        }
-
-        List<String> dialogsKeys = getDialogsI18nKeys();
-        if(dialogsKeys != null){
-            i18nKeys.addAll(dialogsKeys);
         }
 
         return i18nKeys;
-    }
-
-    @Nullable
-    private List<String> getDialogsI18nKeys(){
-        String content;
-        try {
-            File dialog = new File(directory,DIALOG_XML);
-            if(dialog.exists()) {
-                content = FileUtils.readFileToString(dialog, "UTF-8");
-            }else{
-                return null;
-            }
-        } catch (IOException e){
-            return null;
-        }
-        List<String> keys = new ArrayList<>();
-        Matcher matcher = SLY_DIALOG_LABEL_PATTERN.matcher(content);
-        while(matcher.find()){
-            String value = matcher.group(2);
-            keys.add(value);
-        }
-        matcher = SLY_DIALOG_DESCRIPTION_PATTERN.matcher(content);
-        while(matcher.find()){
-            String value = matcher.group(2);
-            keys.add(value);
-        }
-        return keys;
     }
 
     /**
@@ -121,7 +95,7 @@ class Component {
      * @return A List of I18N Keys
      */
     @Nullable
-    private List<String> getFileI18nKeys(File file){
+    private List<String> getFileI18nKeys(File file, boolean withDialog){
         String content;
         try {
             content = FileUtils.readFileToString(file, "UTF-8");
@@ -129,11 +103,36 @@ class Component {
             return null;
         }
         List<String> keys = new ArrayList<>();
-        Matcher matcher = SLY_I18N_PATTERN.matcher(content);
+        Matcher matcher;
+
+
+        //SIGHTLY I18N
+        matcher = SLY_I18N_PATTERN.matcher(content);
         while(matcher.find()){
             String value = matcher.group(2);
             keys.add(value);
         }
+        if(withDialog) {
+            //JCR_TITLE
+            matcher = DIALOG_JCR_TITLE_PATTERN.matcher(content);
+            while (matcher.find()) {
+                String value = matcher.group(2);
+                keys.add(value);
+            }
+            //DIALOG fieldLabel
+            matcher = DIALOG_LABEL_PATTERN.matcher(content);
+            while (matcher.find()) {
+                String value = matcher.group(2);
+                keys.add(value);
+            }
+            //DIALOG fieldDescription
+            matcher = DIALOG_DESCRIPTION_PATTERN.matcher(content);
+            while (matcher.find()) {
+                String value = matcher.group(2);
+                keys.add(value);
+            }
+        }
+
         return keys;
     }
 
@@ -150,6 +149,13 @@ class Component {
 
         Set<File> filesSet = new HashSet<>();
         filesSet.addAll(Arrays.asList(files));
+
+        //add _cq_dialog file
+        File cq_dialog = new File(directory,CQ_DIALOG_XML);
+        if(cq_dialog.exists()){
+            filesSet.add(cq_dialog);
+        }
+
         for(File f : files){
             try {
                 getCompFilesByInclude(f, filesSet);
@@ -170,15 +176,30 @@ class Component {
     private void getCompFilesByInclude(File f, Set<File> files) throws IOException {
         if(f.exists()){
             String content = FileUtils.readFileToString(f,"UTF-8");
-            Matcher matcher = SLY_INCLUDE_PATTERN.matcher(content);
+
+            Matcher matcher;
+            //SIGHTLY INCLUDE
+            matcher = SLY_INCLUDE_PATTERN.matcher(content);
             while(matcher.find()){
-                String value = matcher.group(2);
+                String value = matcher.group(2); //group 2
                 File inclusion = new File(directory, value);
                 if(inclusion.exists() && !files.contains(inclusion)){
                     files.add(inclusion);
                     getCompFilesByInclude(inclusion, files);
                 }
             }
+
+            //DIALOG INCLUDE
+            matcher = DIALOG_INCLUDE_PATTERN.matcher(content);
+            while(matcher.find()){
+                String value = matcher.group(3); //group 3
+                File inclusion = new File(directory, value);
+                if(inclusion.exists() && !files.contains(inclusion)){
+                    files.add(inclusion);
+                    getCompFilesByInclude(inclusion, files);
+                }
+            }
+
         }
     }
 

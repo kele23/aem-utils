@@ -55,6 +55,12 @@ public class GenerateI18n extends AbstractMojo {
     @Parameter
     private boolean withMessage = true;
 
+    /**
+     * Ger i18n from dialog
+     */
+    @Parameter
+    private boolean withDialog = true;
+
 
     public void execute() throws MojoExecutionException
     {
@@ -84,7 +90,7 @@ public class GenerateI18n extends AbstractMojo {
 
         //Add i18n Keys to Every Language
         for(Component cmp : cmps){
-            List<String> i18nKeys = cmp.getI18nKeys();
+            List<String> i18nKeys = cmp.getI18nKeys(withDialog);
             if(i18nKeys == null || i18nKeys.isEmpty()){
                 getLog().warn(cmp.getComponentName() + " => No i18n Keys");
             }else {
