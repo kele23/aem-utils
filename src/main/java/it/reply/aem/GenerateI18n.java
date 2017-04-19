@@ -73,10 +73,12 @@ public class GenerateI18n extends AbstractMojo {
         List<Component> cmps = Component.searchForComponents(components);
         //Get Languages
         List<Language> langs = new ArrayList<>();
+        boolean defaultLang = true;
         for(String lang : languages){
             try{
                 File langFile = new File(i18n,lang.concat(".xml"));
-                langs.add(new Language(lang, langFile, overwriteFile));
+                langs.add(new Language(lang, langFile, overwriteFile, defaultLang));
+                defaultLang = false;
             }catch (ParserConfigurationException ignored) {}
         }
 
@@ -89,19 +91,17 @@ public class GenerateI18n extends AbstractMojo {
                 getLog().info(cmp.getComponentName() + " => " + i18nKeys.size() + " keys");
             }
             for(Language lang : langs) {
-                lang.addI18nKeys(i18nKeys, overwriteKey);
+                lang.addI18nKeys(i18nKeys, overwriteKey, withMessage);
             }
         }
 
-        //Write Out Languages
-        boolean firstLang = true;
-        for(Language lang : langs){
+        //Commit languages
+        for(Language lang: langs){
             try {
-                lang.commit(withMessage || firstLang);
+                lang.commit();
             } catch (IOException e) {
-                getLog().warn("Can't write "+ lang.getLanguage()+ " file");
+                getLog().error(lang.getLanguage()+ " => Can't write language file");
             }
-            firstLang = false;
         }
 
     }

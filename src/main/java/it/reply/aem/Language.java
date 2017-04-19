@@ -39,11 +39,13 @@ class Language {
 
     private String language;
     private File langFile;
+    private boolean defaultLang;
     private HashMap<String,String> map;
 
-    Language(String language, File langFile, boolean overwriteFile) throws ParserConfigurationException {
+    Language(String language, File langFile, boolean overwriteFile, boolean defaultLang) throws ParserConfigurationException {
         this.language = language;
         this.langFile = langFile;
+        this.defaultLang = defaultLang;
         map = new HashMap<>();
 
         //Load current file
@@ -77,7 +79,7 @@ class Language {
      * @param i18nKeys The i18n keys
      * @param overwriteKey Overwrite the key if is already contained
      */
-    void addI18nKeys(List<String> i18nKeys, boolean overwriteKey) {
+    void addI18nKeys(List<String> i18nKeys, boolean overwriteKey, boolean withMessage) {
         for(String key: i18nKeys){
 
             String esc = escape(key);
@@ -86,10 +88,18 @@ class Language {
                 if(map.containsKey(esc)){
                     map.remove(esc);
                 }
-                map.put(esc,esc);
+                if(withMessage || defaultLang) {
+                    map.put(esc, esc);
+                }else{
+                    map.put(esc,"");
+                }
             }else{
                 if(!map.containsKey(esc)){
-                    map.put(esc,esc);
+                    if(withMessage || defaultLang) {
+                        map.put(esc, esc);
+                    }else{
+                        map.put(esc,"");
+                    }
                 }
             }
         }
@@ -98,18 +108,16 @@ class Language {
     /**
      * Write out this language to the file
      */
-    void commit(boolean withMessage) throws IOException {
+    void commit() throws IOException {
         StringBuilder builder = new StringBuilder();
         builder.append(String.format(XML_HEADER,language));
+        int counter = 0;
         for(String key : map.keySet()){
-            String nodeName = key.replaceAll("[^\\p{ASCII}]", "").replaceAll("[\\s+-.,!@#$%^&*()\\[\\]{};\\\\/|<>\"']", "");
+            String nodeName = key.replaceAll("[^\\p{ASCII}]", "").replaceAll("[\\s+-.,!@#$%^&*()\\[\\]{};\\\\/|<>:\"']", "");
             if(nodeName.length() > 20){
-                nodeName = nodeName.substring(0,20);
+                nodeName = nodeName.substring(0,20) + counter++;
             }
-            String message = "";
-            if(withMessage){
-                message = map.get(key);
-            }
+            String message = map.get(key);
             builder.append(String.format(XML_LANGUAGE_NODE,nodeName,key,message));
         }
         builder.append(XML_FOOTER);

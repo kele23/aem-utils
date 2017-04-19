@@ -16,12 +16,19 @@ import java.util.regex.Pattern;
 class Component {
 
     private static final String CONTENT_XML = ".content.xml";
+    private static final String DIALOG_XML = "dialog.xml";
+
     private static final String SLY_CQ_COMPONENT_EXPRESSION = "jcr:primaryType=([\"'])cq:Component\\1";
     private static final String SLY_I18N_EXPRESSION = "\\$\\{[^\"'\\}]*([\"'])(.+)\\1[^\\}]*@[^\\}]*i18n[^\\}]*\\}"; // ${"text" @ i18n} (2:text)
     private static final String SLY_INCLUDE_EXPRESSION = "data-sly-include=([\"'])(.+)\\1"; //data-sly-include="test" => (2:test)
+    private static final String SLY_DIALOG_LABEL_EXPRESSION = "fieldLabel=([\"'])([^\"']+)\\1"; //fieldLabel="ciao" => (2:ciao)
+    private static final String SLY_DIALOG_DESCRIPTION_EXPRESSION = "fieldDescription=([\"'])([^\"']+)\\1"; //fieldDescription="ciao" => (2:ciao)
+
     private static final Pattern SLY_I18N_PATTERN = Pattern.compile(SLY_I18N_EXPRESSION);
     private static final Pattern SLY_INCLUDE_PATTERN = Pattern.compile(SLY_INCLUDE_EXPRESSION);
     private static final Pattern SLY_CQ_COMPONENT_PATTERN = Pattern.compile(SLY_CQ_COMPONENT_EXPRESSION);
+    private static final Pattern SLY_DIALOG_LABEL_PATTERN = Pattern.compile(SLY_DIALOG_LABEL_EXPRESSION);
+    private static final Pattern SLY_DIALOG_DESCRIPTION_PATTERN = Pattern.compile(SLY_DIALOG_DESCRIPTION_EXPRESSION);
 
     private File directory;
     private String componentName;
@@ -64,6 +71,7 @@ class Component {
         if(htmlFiles == null)
             return null;
 
+        //Component i18n
         List<String> i18nKeys = new ArrayList<>();
         for(File f : htmlFiles) {
             List<String> keys = getFileI18nKeys(f);
@@ -71,7 +79,40 @@ class Component {
                 i18nKeys.addAll(keys);
             }
         }
+
+        List<String> dialogsKeys = getDialogsI18nKeys();
+        if(dialogsKeys != null){
+            i18nKeys.addAll(dialogsKeys);
+        }
+
         return i18nKeys;
+    }
+
+    @Nullable
+    private List<String> getDialogsI18nKeys(){
+        String content;
+        try {
+            File dialog = new File(directory,DIALOG_XML);
+            if(dialog.exists()) {
+                content = FileUtils.readFileToString(dialog, "UTF-8");
+            }else{
+                return null;
+            }
+        } catch (IOException e){
+            return null;
+        }
+        List<String> keys = new ArrayList<>();
+        Matcher matcher = SLY_DIALOG_LABEL_PATTERN.matcher(content);
+        while(matcher.find()){
+            String value = matcher.group(2);
+            keys.add(value);
+        }
+        matcher = SLY_DIALOG_DESCRIPTION_PATTERN.matcher(content);
+        while(matcher.find()){
+            String value = matcher.group(2);
+            keys.add(value);
+        }
+        return keys;
     }
 
     /**
