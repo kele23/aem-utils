@@ -1,5 +1,5 @@
 # aem-utils
-Maven repo with some useful utilities for AEM
+Maven useful utilities for AEM
 =======
 ```xml
 <plugin>
