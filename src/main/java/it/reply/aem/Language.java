@@ -112,11 +112,19 @@ class Language {
         StringBuilder builder = new StringBuilder();
         builder.append(String.format(XML_HEADER,language));
         int counter = 0;
+        Set<String> nodeNames = new HashSet<>();
         for(String key : map.keySet()){
             String nodeName = key.replaceAll("[^\\p{ASCII}]", "").replaceAll("[\\s+-.,!@#$%^&*()\\[\\]{};\\\\/|<>:\"']", "");
+            if( nodeName.matches("^[0-9].*") ){
+                nodeName = "N" + nodeName;
+            }
             if(nodeName.length() > 20){
                 nodeName = nodeName.substring(0,20) + counter++;
             }
+            if( nodeNames.contains(nodeName) ){
+                nodeName += counter++;
+            }
+            nodeNames.add(nodeName);
             String message = map.get(key);
             builder.append(String.format(XML_LANGUAGE_NODE,nodeName,key,message));
         }
