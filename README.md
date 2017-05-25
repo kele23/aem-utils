@@ -13,6 +13,7 @@ Maven useful utilities for AEM
         <overwriteKey>false</overwriteKey><!--Overwrites key if is already defined-->
         <overwriteFile>false</overwriteFile><!--Overwrites current i18n files-->
         <withMessage>true</withMessage> <!--Sets Message for non default languages-->
+        <withDialog>true</withDialog>
         <languages>
             <param>en</param> <!--Default Language (code language)-->
             <param>it</param>
