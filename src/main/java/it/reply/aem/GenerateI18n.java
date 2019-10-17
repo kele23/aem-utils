@@ -1,34 +1,43 @@
 package it.reply.aem;
 
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 
-@Mojo( name = "generate-i18n", defaultPhase = LifecyclePhase.PROCESS_SOURCES )
+@Mojo(name = "generate-i18n", defaultPhase = LifecyclePhase.PROCESS_SOURCES)
 public class GenerateI18n extends AbstractMojo {
 
     /////////////////////////////////////////////////////////////////FILES - DIRECTORIES
-    private static final String I18N_DIR = "i18n";
-    private static final String COMPONENTS_DIR = "components";
 
     /**
      * The components directory
      */
-    @Parameter( required = true )
+    @Parameter(required = true)
     private File components = null;
 
     /**
      * The i18n directory
      */
-    @Parameter( required = true )
+    @Parameter(required = true)
     private File i18n = null;
 
     /**
@@ -55,58 +64,78 @@ public class GenerateI18n extends AbstractMojo {
     @Parameter
     private boolean withMessage = true;
 
-    /**
-     * Ger i18n from dialog
-     */
-    @Parameter
-    private boolean withDialog = true;
+    private static final Pattern PATTERN_I18N =
+            Pattern.compile("\\$\\{[^\"']*((?<![\\\\])['\"])((?:.(?!(?<![\\\\])\\1))*.?)\\1[^@]+@" + ".*i18n.*}");
 
+    public void execute() throws MojoExecutionException {
 
-    public void execute() throws MojoExecutionException
-    {
-
-        if ( i18n == null || !i18n.exists() || !i18n.isDirectory() )
-        {
-            throw new MojoExecutionException( "Can't find the i18n directory." );
+        if (i18n == null || !i18n.exists() || !i18n.isDirectory()) {
+            throw new MojoExecutionException("Can't find the i18n directory.");
         }
 
-        if ( components == null || !components.exists() || !components.isDirectory() )
-        {
-            throw new MojoExecutionException( "Components directory does not exist." );
+        if (components == null || !components.exists() || !components.isDirectory()) {
+            throw new MojoExecutionException("Components directory does not exist.");
         }
 
-        //Get Components
-        List<Component> cmps = Component.searchForComponents(components);
         //Get Languages
         List<Language> langs = new ArrayList<>();
         boolean defaultLang = true;
-        for(String lang : languages){
-            try{
-                File langFile = new File(i18n,lang.concat(".xml"));
+        for (String lang : languages) {
+            try {
+                File langFile = new File(i18n, lang.concat(".xml"));
                 langs.add(new Language(lang, langFile, overwriteFile, defaultLang));
                 defaultLang = false;
-            }catch (ParserConfigurationException ignored) {}
+            } catch (ParserConfigurationException ignored) {
+            }
         }
 
-        //Add i18n Keys to Every Language
-        for(Component cmp : cmps){
-            List<String> i18nKeys = cmp.getI18nKeys(withDialog);
-            if(i18nKeys == null || i18nKeys.isEmpty()){
-                getLog().warn(cmp.getComponentName() + " => No i18n Keys");
-            }else {
-                getLog().info(cmp.getComponentName() + " => " + i18nKeys.size() + " keys");
+        //get all i18n texts
+        try {
+
+            List<Path> files = Files.walk(Paths.get(components.getPath()))
+                    .filter(Files::isRegularFile)
+                    .filter(path -> "html".equals(FilenameUtils.getExtension(path.normalize().toString())))
+                    .collect(Collectors.toList());
+
+            int total = 0;
+
+            for (Path filePath : files) {
+                File file = filePath.toFile();
+
+                String fileContent = IOUtils.toString(new FileInputStream(file), "UTF-8");
+                Matcher matcher = PATTERN_I18N.matcher(fileContent);
+                List<String> i18nKeys = new ArrayList<>();
+                while (matcher.find()) {
+                    String i18nText = matcher.group(2);
+                    i18nText = StringEscapeUtils.unescapeJava(i18nText);
+                    i18nKeys.add(i18nText);
+                }
+
+                int size = i18nKeys.size();
+                total += size;
+                String fileRelativePath = file.getPath().substring(components.getPath().length());
+                if (size > 0)
+                    getLog().info("File " + fileRelativePath + " => N# " + size + " keys");
+                else
+                    getLog().warn("File " + fileRelativePath + " => N# " + size + " keys");
+
+                for (Language lang : langs) {
+                    lang.addI18nKeys(i18nKeys, overwriteKey, withMessage);
+                }
             }
-            for(Language lang : langs) {
-                lang.addI18nKeys(i18nKeys, overwriteKey, withMessage);
-            }
+
+            getLog().info("Founded  => N# " + total + " keys");
+
+        } catch (IOException e) {
+            e.printStackTrace();
         }
 
         //Commit languages
-        for(Language lang: langs){
+        for (Language lang : langs) {
             try {
                 lang.commit();
             } catch (IOException e) {
-                getLog().error(lang.getLanguage()+ " => Can't write language file");
+                getLog().error(lang.getLanguage() + " => Can't write language file");
             }
         }
 

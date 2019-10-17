@@ -13,21 +13,20 @@ import java.io.*;
 
 /**
  * Created by m.scala on 15-Jun-17.
- *
  */
-@Mojo( name = "npm-run", defaultPhase = LifecyclePhase.GENERATE_RESOURCES )
+@Mojo(name = "npm-run", defaultPhase = LifecyclePhase.GENERATE_RESOURCES)
 public class NpmRun extends AbstractMojo {
 
     /**
      * The Npm Build project directory
      */
-    @Parameter( required = true )
+    @Parameter(required = true)
     private File npmDir = null;
 
     /**
      * The Clientlib directory
      */
-    @Parameter( required = true )
+    @Parameter(required = true)
     private File clientlibDir = null;
 
     /**
@@ -45,20 +44,18 @@ public class NpmRun extends AbstractMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
 
-        if ( npmDir == null || !npmDir.exists() || !npmDir.isDirectory() )
-        {
-            throw new MojoExecutionException( "Npm project directory does not exist." );
+        if (npmDir == null || !npmDir.exists() || !npmDir.isDirectory()) {
+            throw new MojoExecutionException("Npm project directory does not exist.");
         }
 
-        if ( clientlibDir == null || !clientlibDir.exists() || !clientlibDir.isDirectory() )
-        {
-            throw new MojoExecutionException( "Clientlib directory does not exist." );
+        if (clientlibDir == null || !clientlibDir.exists() || !clientlibDir.isDirectory()) {
+            throw new MojoExecutionException("Clientlib directory does not exist.");
         }
 
         Runtime rt = Runtime.getRuntime();
         String npm = isWindows() ? "npm.cmd" : "npm";
         try {
-            Process pr = rt.exec(npm + " run " + command,null, npmDir);
+            Process pr = rt.exec(npm + " run " + command, null, npmDir);
 
             StreamGobbler errorGobbler = new StreamGobbler(pr.getErrorStream(), getLog(), LogType.ERROR);
             StreamGobbler outputGobbler = new StreamGobbler(pr.getInputStream(), getLog(), LogType.INFO);
@@ -70,15 +67,14 @@ public class NpmRun extends AbstractMojo {
             e.printStackTrace();
         }
 
-        File distDir = new File(npmDir,distName);
-        if ( !distDir.exists() || !distDir.isDirectory() )
-        {
-            throw new MojoExecutionException( "Dist directory does not exist." );
+        File distDir = new File(npmDir, distName);
+        if (!distDir.exists() || !distDir.isDirectory()) {
+            throw new MojoExecutionException("Dist directory does not exist.");
         }
 
         getLog().info("Copying dist directory");
         try {
-            FileUtils.copyDirectory(distDir,clientlibDir);
+            FileUtils.copyDirectory(distDir, clientlibDir);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -90,11 +86,11 @@ public class NpmRun extends AbstractMojo {
             FileWriter cssWriter = new FileWriter(cssTxt);
 
             String names[] = clientlibDir.list();
-            if(names != null){
+            if (names != null) {
                 for (String name : names) {
-                    if(name.matches(".*\\.js$")){
+                    if (name.matches(".*\\.js$")) {
                         jsWriter.append(name).append("\n");
-                    }else if(name.matches(".*\\.css$")){
+                    } else if (name.matches(".*\\.css$")) {
                         cssWriter.append(name).append("\n");
                     }
                 }
@@ -139,17 +135,17 @@ public class NpmRun extends AbstractMojo {
                 InputStreamReader isr = new InputStreamReader(is);
                 BufferedReader br = new BufferedReader(isr);
                 String line = null;
-                while ( (line = br.readLine()) != null) {
-                    switch (logType){
-                        case INFO:{
+                while ((line = br.readLine()) != null) {
+                    switch (logType) {
+                        case INFO: {
                             log.info(line);
                             break;
                         }
-                        case ERROR:{
+                        case ERROR: {
                             log.error(line);
                             break;
                         }
-                        case WARNING:{
+                        case WARNING: {
                             log.warn(line);
                             break;
                         }
