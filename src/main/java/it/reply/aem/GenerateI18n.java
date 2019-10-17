@@ -65,7 +65,7 @@ public class GenerateI18n extends AbstractMojo {
     private boolean withMessage = true;
 
     private static final Pattern PATTERN_I18N =
-            Pattern.compile("\\$\\{[^\"']*((?<![\\\\])['\"])((?:.(?!(?<![\\\\])\\1))*.?)\\1[^@]+@" + ".*i18n.*}");
+            Pattern.compile("\\$\\{[^'\"}]*((?<![\\\\])['\"])((?:.(?!(?<![\\\\])\\1))*.?)\\1[^@}]*@[^}]*i18n[^}]*}");
 
     public void execute() throws MojoExecutionException {
 
